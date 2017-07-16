@@ -1080,7 +1080,7 @@ namespace YukkoView
 		{
 			try
 			{
-				YukkoViewCommon.ShowHelp();
+				YukkoViewCommon.ShowHelp(mLogWriter);
 			}
 			catch (Exception oExcep)
 			{

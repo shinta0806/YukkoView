@@ -156,7 +156,7 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		// ヘルプの表示
 		// --------------------------------------------------------------------
-		public static void ShowHelp()
+		public static void ShowHelp(LogWriter oLogWriter)
 		{
 			try
 			{
@@ -164,7 +164,7 @@ namespace YukkoView.Shared
 			}
 			catch (Exception)
 			{
-				Common.ShowLogMessage(TraceEventType.Error, "ヘルプを表示できませんでした。\n" + FILE_NAME_HELP);
+				oLogWriter.ShowLogMessage(TraceEventType.Error, "ヘルプを表示できませんでした。\n" + FILE_NAME_HELP);
 			}
 		}
 
