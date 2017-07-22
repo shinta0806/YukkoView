@@ -546,21 +546,26 @@ namespace YukkoView
 		{
 			try
 			{
-				Int32 aDrawHeight = mLastDrawHeight;
+				Int32 aThisDrawHeight = 0;
 
 				lock (mCommentInfosLock)
 				{
 					// オフスクリーンの描画高さ設定
 					foreach (CommentInfo aCommentInfo in mCommentInfos)
 					{
-						if (aCommentInfo.Bottom > aDrawHeight)
+						if (aCommentInfo.Bottom > aThisDrawHeight)
 						{
-							aDrawHeight = Bottom;
+							aThisDrawHeight = aCommentInfo.Bottom;
 						}
+					}
+					Int32 aMargeDrawHeight = Math.Max(mLastDrawHeight, aThisDrawHeight);
+					if (aMargeDrawHeight == 0)
+					{
+						return;
 					}
 
 					// クリア
-					mOffScreenGraphics.FillRectangle(mBgBrush, 0, 0, Width, aDrawHeight);
+					mOffScreenGraphics.FillRectangle(mBgBrush, 0, 0, Width, aMargeDrawHeight);
 
 					// コメント描画と移動
 					LinkedListNode<CommentInfo> aNode = mCommentInfos.First;
@@ -588,12 +593,12 @@ namespace YukkoView
 					}
 
 					// 描画
-					mFormGraphics.DrawImage(mOffScreen, 0, 0, new Rectangle(0, 0, Width, aDrawHeight), GraphicsUnit.Pixel);
+					mFormGraphics.DrawImage(mOffScreen, 0, 0, new Rectangle(0, 0, Width, aMargeDrawHeight), GraphicsUnit.Pixel);
 
 				}
 
 				// 後処理
-				mLastDrawHeight = aDrawHeight;
+				mLastDrawHeight = aThisDrawHeight;
 			}
 			catch (Exception oExcep)
 			{
