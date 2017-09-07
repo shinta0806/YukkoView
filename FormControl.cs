@@ -134,6 +134,9 @@ namespace YukkoView
 		// ゆかり設定読み込み状況
 		private Boolean mIsYukariConfigError = false;
 
+		// ゆかり設定読み込みエラー内容
+		private String mYukariConfigErrorMessage;
+
 		// コメント開始中
 		private Boolean mIsRunning = false;
 
@@ -367,6 +370,10 @@ namespace YukkoView
 				// 設定取得
 				String aString;
 				GetYukariConfig(aLines, YUKARI_CONFIG_KEY_NAME_SERVER_URL, out aString);
+				if (String.IsNullOrEmpty(aString) || aString.LastIndexOf("/") < 0)
+				{
+					throw new Exception("コメントサーバーが設定されていません。");
+				}
 				mYukkoViewSettings.ServerUrl = aString.Substring(0, aString.LastIndexOf("/")) + "/c.php";
 				GetYukariConfig(aLines, YUKARI_CONFIG_KEY_NAME_ROOM_NAME, out aString);
 				mYukkoViewSettings.RoomName = aString;
@@ -374,7 +381,9 @@ namespace YukkoView
 			catch (Exception oExcep)
 			{
 				mIsYukariConfigError = true;
+				mYukariConfigErrorMessage = oExcep.Message;
 				mLogWriter.LogMessage(TraceEventType.Error, "ゆかり設定読み込みエラー：\n" + oExcep.Message);
+				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
 		}
 
@@ -635,6 +644,10 @@ namespace YukkoView
 		{
 			Invoke(new Action(() =>
 			{
+				// クリア
+				ToolTipControl.SetToolTip(LabelStatus, null);
+
+				// 更新
 				if (mIsRunning)
 				{
 					if (mIsCommentReceiveError)
@@ -654,6 +667,7 @@ namespace YukkoView
 					{
 						LabelLamp.ForeColor = COLOR_STATUS_ERROR;
 						LabelStatus.Text = "ゆかりの設定を読み込めませんでした";
+						ToolTipControl.SetToolTip(LabelStatus, mYukariConfigErrorMessage);
 					}
 					else
 					{

@@ -62,6 +62,7 @@
 			this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
 			this.改訂履歴UToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.バージョン情報ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.ToolTipControl = new System.Windows.Forms.ToolTip(this.components);
 			this.groupBox1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.FileSystemWatcherYukariConfig)).BeginInit();
 			this.ContextMenuHelp.SuspendLayout();
@@ -361,6 +362,12 @@
 			this.バージョン情報ToolStripMenuItem.Text = "バージョン情報 (&A)";
 			this.バージョン情報ToolStripMenuItem.Click += new System.EventHandler(this.バージョン情報ToolStripMenuItem_Click);
 			// 
+			// ToolTipControl
+			// 
+			this.ToolTipControl.AutoPopDelay = 10000;
+			this.ToolTipControl.InitialDelay = 500;
+			this.ToolTipControl.ReshowDelay = 100;
+			// 
 			// FormControl
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
@@ -432,6 +439,7 @@
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
 		private System.Windows.Forms.ToolStripMenuItem 改訂履歴UToolStripMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem バージョン情報ToolStripMenuItem;
+		private System.Windows.Forms.ToolTip ToolTipControl;
 	}
 }
 
