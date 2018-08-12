@@ -198,7 +198,7 @@
 			// 
 			// SaveFileDialogLog
 			// 
-			this.SaveFileDialogLog.Filter = "ログファイル|*.la";
+			this.SaveFileDialogLog.Filter = "ログファイル|*.lga";
 			// 
 			// FormSettings
 			// 

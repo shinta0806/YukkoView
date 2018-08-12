@@ -173,6 +173,8 @@ namespace YukkoView
 #if DEBUG
 				Text = "［デバッグ］" + Text;
 #endif
+
+				Common.CascadeForm(this);
 			}
 			catch (Exception oExcep)
 			{
@@ -263,7 +265,7 @@ namespace YukkoView
 			try
 			{
 				MakeLatestComposRunning();
-				if (YukkoViewCommon.LaunchUpdater(true, true, Handle, true, false, mLogWriter) != StatusT.Ok)
+				if (!YukkoViewCommon.LaunchUpdater(true, true, Handle, true, false, mLogWriter))
 				{
 					MakeAllComposNormal();
 				}
@@ -280,6 +282,7 @@ namespace YukkoView
 		{
 			try
 			{
+				SaveFileDialogLog.FileName = "YukkoViewLog_" + DateTime.Now.ToString("yyyy_MM_dd-HH_mm_ss");
 				if (SaveFileDialogLog.ShowDialog() != DialogResult.OK)
 				{
 					return;

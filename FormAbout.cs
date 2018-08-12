@@ -86,6 +86,8 @@ namespace YukkoView
 				LabelAppVer.Text = YukkoViewCommon.APP_VER;
 				LabelCopyright.Text = YukkoViewCommon.COPYRIGHT_J;
 
+				Common.CascadeForm(this);
+
 				// コントロール
 				ActiveControl = ButtonOK;
 			}

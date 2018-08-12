@@ -51,8 +51,9 @@ namespace YukkoView
 		public void AddComment(CommentInfo oCommentInfo)
 		{
 			// 連続投稿防止
-			if (oCommentInfo.CompareBase(mPrevCommentInfo) && oCommentInfo.Tick - mPrevCommentInfo.Tick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
+			if (oCommentInfo.CompareBase(mPrevCommentInfo) && oCommentInfo.InitialTick - mPrevCommentInfo.InitialTick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
 			{
+				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "連続投稿 [B] のため表示しません：" + oCommentInfo.Message);
 				return;
 			}
 			mPrevCommentInfo = oCommentInfo;
@@ -62,16 +63,34 @@ namespace YukkoView
 			// 描画情報設定
 			SetCommentMessagePath(oCommentInfo);
 			SetCommentBrush(oCommentInfo);
+			CalcSpeed(oCommentInfo);
 
 			// 位置設定（描画情報設定後に実行）
 			// 文字を描画する際、X 位置ぴったりよりも少し右に描画されるので、少し左目に初期位置を設定する
-			MoveComment(oCommentInfo, Width - DeltaLeft(oCommentInfo) - mCommentSpeed, CalcCommentTop(oCommentInfo));
+			Int32 aX = CalcCommentLeft(oCommentInfo);
+			Int32 aY = CalcCommentTop(oCommentInfo);
+			MoveComment(oCommentInfo, aX, aY);
+			mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントを表示します。初期位置：" + aX + ", " + aY + ", 幅：" + oCommentInfo.Width
+					+ ", 速度：" + oCommentInfo.Speed);
 
 			// 追加
 			lock (mCommentInfosLock)
 			{
 				mCommentInfos.AddLast(oCommentInfo);
 			}
+		}
+
+		// --------------------------------------------------------------------
+		// 表示しているコメントの数
+		// --------------------------------------------------------------------
+		public Int32 NumComments()
+		{
+			Int32 aNumComments;
+			lock (mCommentInfosLock)
+			{
+				aNumComments = mCommentInfos.Count;
+			}
+			return aNumComments;
 		}
 
 		// --------------------------------------------------------------------
@@ -114,7 +133,7 @@ namespace YukkoView
 		private const Single DEFAULT_FONT_SCALE = 0.07F;
 
 		// コメントが画面端から端まで到達するのに要する時間 [ms]
-		private const Int32 COMMENT_VIEWING_TIME = 7500;
+		private const Int32 COMMENT_VIEWING_TIME = 12000;
 
 		// フォント
 		private const String FONT_NAME_MARLETT = "Marlett";
@@ -154,9 +173,6 @@ namespace YukkoView
 		// フォントサイズ "1" に対するピクセル数
 		private Single mFontUnit;
 
-		// コメント速度 [px]
-		private Int32 mCommentSpeed;
-
 		// コメント情報管理
 		private LinkedList<CommentInfo> mCommentInfos = new LinkedList<CommentInfo>();
 
@@ -174,7 +190,15 @@ namespace YukkoView
 		// ====================================================================
 
 		// --------------------------------------------------------------------
-		// 新規コメント投入時の、コメント描画位置（高さ）を算出
+		// コメント描画位置（水平）を算出
+		// --------------------------------------------------------------------
+		private Int32 CalcCommentLeft(CommentInfo oCommentInfo)
+		{
+			return Width - DeltaLeft(oCommentInfo) - oCommentInfo.Speed * (Environment.TickCount - oCommentInfo.InitialTick) / 1000;
+		}
+
+		// --------------------------------------------------------------------
+		// 新規コメント投入時の、コメント描画位置（垂直）を算出
 		// --------------------------------------------------------------------
 		private Int32 CalcCommentTop(CommentInfo oNewCommentInfo)
 		{
@@ -194,8 +218,8 @@ namespace YukkoView
 			{
 				foreach (CommentInfo aCommentInfo in mCommentInfos)
 				{
-					// ある程度中央に流れているコメントなら範囲がかぶっても構わない
-					if (aCommentInfo.Right + aCommentInfo.Height < Width - DeltaLeft(aCommentInfo))
+					// ある程度中央に流れているコメントで、かつ、速度が同等以上なら逃げ切れるので範囲がかぶっても構わない
+					if (aCommentInfo.Right + aCommentInfo.Height < Width - DeltaLeft(aCommentInfo) && aCommentInfo.Speed >= oNewCommentInfo.Speed)
 					{
 						continue;
 					}
@@ -244,6 +268,14 @@ namespace YukkoView
 			// 新しいコメントが入る範囲がないので弾幕モードとする
 			Random aRand = new Random();
 			return aRand.Next(aMaxBottom - aMinTop - oNewCommentInfo.Height) + aMinTop;
+		}
+
+		// --------------------------------------------------------------------
+		// コメント移動速度
+		// --------------------------------------------------------------------
+		private void CalcSpeed(CommentInfo oCommentInfo)
+		{
+			oCommentInfo.Speed = (ClientSize.Width + oCommentInfo.Width) / (COMMENT_VIEWING_TIME / 1000);
 		}
 
 		// --------------------------------------------------------------------
@@ -321,6 +353,7 @@ namespace YukkoView
 			Matrix aTranslateMatrix = new Matrix();
 			aTranslateMatrix.Translate(oDx, oDy);
 			oCommentInfo.MessagePath.Transform(aTranslateMatrix);
+			oCommentInfo.SpecifyLeft += oDx;
 		}
 
 		// --------------------------------------------------------------------
@@ -340,9 +373,6 @@ namespace YukkoView
 
 			// フォントサイズ
 			mFontUnit = ClientSize.Height * DEFAULT_FONT_SCALE / YukkoViewCommon.DEFAULT_YUKARI_FONT_SIZE;
-
-			// コメント速度
-			mCommentSpeed = ClientSize.Width / (COMMENT_VIEWING_TIME / TimerPlay.Interval);
 		}
 
 		// --------------------------------------------------------------------
@@ -574,7 +604,7 @@ namespace YukkoView
 						CommentInfo aCommentInfo = aNode.Value;
 						mOffScreenGraphics.DrawPath(mEdgePen, aCommentInfo.MessagePath);
 						mOffScreenGraphics.FillPath(aCommentInfo.Brush, aCommentInfo.MessagePath);
-						MoveComment(aCommentInfo, -mCommentSpeed, 0);
+						MoveComment(aCommentInfo, CalcCommentLeft(aCommentInfo) - aCommentInfo.SpecifyLeft, 0);
 
 						if (aCommentInfo.Right <= 0)
 						{

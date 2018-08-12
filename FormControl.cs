@@ -184,16 +184,23 @@ namespace YukkoView
 					Downloader aDownloader = new Downloader();
 					aDownloader.CancellationToken = mClosingCancellationTokenSource.Token;
 
-					for (;;)
+					CommentInfo aPoolCommentInfo = null;
+					for (; ; )
 					{
-						CommentInfo aPoolCommentInfo = null;
 						CommentInfo aPrevCommentInfo = null;
+						Int32 aInitialTick = Environment.TickCount;
 
 						try
 						{
 							// サーバーに溜まっているコメントをすべて読み込む
-							for (;;)
+							for (; ; )
 							{
+								// コメント表示数が多い場合はスキップ
+								if (mFormViewer.NumComments() >= YukkoViewCommon.NUM_DISPLAY_COMMENTS_MAX)
+								{
+									break;
+								}
+
 								// サーバーの負荷軽減のためちょっとだけ休む
 								Thread.Sleep(Common.GENERAL_SLEEP_TIME);
 
@@ -221,13 +228,16 @@ namespace YukkoView
 								aCommentInfo.Message = aComment.Substring(7, aComment.Length - 8);
 								aCommentInfo.YukariSize = Int32.Parse(aComment.Substring(0, 1));
 								aCommentInfo.Color = Color.FromArgb((Int32)(Convert.ToInt32(aComment.Substring(1, 6), 16) | 0xFF000000));
+								aCommentInfo.InitialTick = aInitialTick;
 								mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントをダウンロードしました：" + aCommentInfo.Message);
 
 								// 直前の（結合前の）コメントと重複していないか確認
-								if (aCommentInfo.CompareBase(aPrevCommentInfo) && aCommentInfo.Tick - aPrevCommentInfo.Tick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
+								if (aCommentInfo.CompareBase(aPrevCommentInfo) && aCommentInfo.InitialTick - aPrevCommentInfo.InitialTick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
 								{
+									mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "連続投稿 [A] のため表示しません：" + aCommentInfo.Message);
 									continue;
 								}
+								aPrevCommentInfo = aCommentInfo;
 
 								if (aPoolCommentInfo != null && (aPoolCommentInfo.YukariSize != aCommentInfo.YukariSize || aPoolCommentInfo.Color != aCommentInfo.Color))
 								{
@@ -281,7 +291,7 @@ namespace YukkoView
 						}
 
 						// 前回休憩以前のコメントがプールされているなら発行する
-						if (aPoolCommentInfo != null && Environment.TickCount - aPoolCommentInfo.Tick > mYukkoViewSettings.Interval)
+						if (aPoolCommentInfo != null && Environment.TickCount - aPoolCommentInfo.InitialTick > mYukkoViewSettings.Interval)
 						{
 							mFormViewer.AddComment(aPoolCommentInfo);
 							aPoolCommentInfo = null;
@@ -573,6 +583,7 @@ namespace YukkoView
 			aCommentInfo.Message = "コメント表示を開始します";
 			aCommentInfo.YukariSize = YukkoViewCommon.DEFAULT_YUKARI_FONT_SIZE;
 			aCommentInfo.Color = Color.White;
+			aCommentInfo.InitialTick = Environment.TickCount;
 			mFormViewer.AddComment(aCommentInfo);
 
 			// コメントサーバーからコメントを受信
@@ -743,7 +754,7 @@ namespace YukkoView
 				// 必要に応じてちょちょいと自動更新を起動
 				if (mYukkoViewSettings.IsCheckRssNeeded())
 				{
-					if (YukkoViewCommon.LaunchUpdater(true, false, IntPtr.Zero, false, false, mLogWriter) == StatusT.Ok)
+					if (YukkoViewCommon.LaunchUpdater(true, false, IntPtr.Zero, false, false, mLogWriter))
 					{
 						mYukkoViewSettings.RssCheckDate = DateTime.Now.Date;
 						mYukkoViewSettings.Save();
@@ -904,6 +915,7 @@ namespace YukkoView
 				aCommentInfo.Message = TextBoxTest.Text;
 				aCommentInfo.YukariSize = YukkoViewCommon.DEFAULT_YUKARI_FONT_SIZE;
 				aCommentInfo.Color = COLOR_TEST_COMMENTS[mTestCommentColorIndex];
+				aCommentInfo.InitialTick = Environment.TickCount;
 
 				// 色番号調整
 				mTestCommentColorIndex++;

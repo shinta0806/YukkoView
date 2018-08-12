@@ -45,8 +45,8 @@ namespace YukkoView.Shared
 		// アプリの基本情報
 		// --------------------------------------------------------------------
 		public const String APP_NAME_J = "ゆっこビュー";
-		public const String APP_VER = "Ver 2.18";
-		public const String COPYRIGHT_J = "Copyright (C) 2017 by SHINTA";
+		public const String APP_VER = "Ver 2.30";
+		public const String COPYRIGHT_J = "Copyright (C) 2017-2018 by SHINTA";
 
 		// --------------------------------------------------------------------
 		// 環境設定
@@ -55,6 +55,9 @@ namespace YukkoView.Shared
 		// コメント表示上下マージン
 		public const Int32 MARGIN_PERCENT_MIN = 1;
 		public const Int32 MARGIN_PERCENT_MAX = 25;
+
+		// 同時に表示するコメントの最大数
+		public const Int32 NUM_DISPLAY_COMMENTS_MAX = 7;
 
 		// --------------------------------------------------------------------
 		// ファイル名・フォルダー名
@@ -100,7 +103,7 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		// ちょちょいと自動更新を起動
 		// --------------------------------------------------------------------
-		public static StatusT LaunchUpdater(Boolean oCheckLatest, Boolean oForceShow, IntPtr oHWnd, Boolean oClearUpdateCache, Boolean oForceInstall, LogWriter oLogWriter)
+		public static Boolean LaunchUpdater(Boolean oCheckLatest, Boolean oForceShow, IntPtr oHWnd, Boolean oClearUpdateCache, Boolean oForceInstall, LogWriter oLogWriter)
 		{
 			// 固定部分
 			UpdaterLauncher aUpdaterLauncher = new UpdaterLauncher();
@@ -149,8 +152,7 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		public static String SettingsPath()
 		{
-			return Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(Application.UserAppDataPath))) + "\\"
-					+ Common.FOLDER_NAME_SHINTA + FOLDER_NAME_YUKKOVIEW;
+			return Path.GetDirectoryName(Application.UserAppDataPath) + "\\";
 		}
 
 		// --------------------------------------------------------------------
@@ -194,12 +196,18 @@ namespace YukkoView.Shared
 		// 色
 		public Color Color { get; set; }
 
+		// コメントを取得した時刻
+		public Int32 InitialTick { get; set; }
+
 		// --------------------------------------------------------------------
-		// 時刻情報
+		// ビューア側で計算する情報
 		// --------------------------------------------------------------------
 
-		// 取得時刻
-		public Int32 Tick { get; set; }
+		// 移動速度 [px/s]
+		public Int32 Speed { get; set; }
+
+		// 描画指定位置
+		public Int32 SpecifyLeft { get; set; }
 
 		// --------------------------------------------------------------------
 		// 描画情報
@@ -266,6 +274,14 @@ namespace YukkoView.Shared
 		}
 
 		// 表示されるサイズ（縁取り込み）
+		public Int32 Width
+		{
+			get
+			{
+				return (Int32)(mMessagePath.GetBounds().Width + YukkoViewCommon.EDGE_WIDTH);
+			}
+		}
+
 		public Int32 Height
 		{
 			get
@@ -283,7 +299,6 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		public CommentInfo()
 		{
-			Tick = Environment.TickCount;
 		}
 
 		// ====================================================================
