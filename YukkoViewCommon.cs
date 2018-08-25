@@ -45,7 +45,7 @@ namespace YukkoView.Shared
 		// アプリの基本情報
 		// --------------------------------------------------------------------
 		public const String APP_NAME_J = "ゆっこビュー";
-		public const String APP_VER = "Ver 2.30";
+		public const String APP_VER = "Ver 2.52";
 		public const String COPYRIGHT_J = "Copyright (C) 2017-2018 by SHINTA";
 
 		// --------------------------------------------------------------------

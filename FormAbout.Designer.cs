@@ -247,6 +247,7 @@
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "FormAbout";
+			this.ShowInTaskbar = false;
 			this.Load += new System.EventHandler(this.FormAbout_Load);
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
 			this.GroupBoxAuthorInfo.ResumeLayout(false);

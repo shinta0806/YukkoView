@@ -163,6 +163,36 @@ namespace YukkoView.Shared
 			}
 		}
 
+		private const String KEY_NAME_RECEIVE_PUSH = "ReceivePush";
+		[UserScopedSetting]
+		[DefaultSettingValue(Common.BOOLEAN_STRING_TRUE)]
+		public Boolean ReceivePush
+		{
+			get
+			{
+				return (Boolean)this[KEY_NAME_RECEIVE_PUSH];
+			}
+			set
+			{
+				this[KEY_NAME_RECEIVE_PUSH] = value;
+			}
+		}
+
+		private const String KEY_NAME_RECEIVE_PUSH_PORT = "ReceivePushPort";
+		[UserScopedSetting]
+		[DefaultSettingValue("13581")]
+		public Int32 ReceivePushPort
+		{
+			get
+			{
+				return (Int32)this[KEY_NAME_RECEIVE_PUSH_PORT];
+			}
+			set
+			{
+				this[KEY_NAME_RECEIVE_PUSH_PORT] = value;
+			}
+		}
+
 		private const String KEY_NAME_INTERVAL = "Interval";
 		[UserScopedSetting]
 		[DefaultSettingValue("1000")]

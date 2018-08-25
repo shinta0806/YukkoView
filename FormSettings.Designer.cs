@@ -46,6 +46,10 @@
 			this.ButtonCancel = new System.Windows.Forms.Button();
 			this.ButtonOK = new System.Windows.Forms.Button();
 			this.SaveFileDialogLog = new System.Windows.Forms.SaveFileDialog();
+			this.groupBox1 = new System.Windows.Forms.GroupBox();
+			this.RadioButtonDownload = new System.Windows.Forms.RadioButton();
+			this.RadioButtonPush = new System.Windows.Forms.RadioButton();
+			this.groupBox1.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// CheckBoxAutoRun
@@ -53,9 +57,9 @@
 			this.CheckBoxAutoRun.AutoSize = true;
 			this.CheckBoxAutoRun.Location = new System.Drawing.Point(16, 48);
 			this.CheckBoxAutoRun.Name = "CheckBoxAutoRun";
-			this.CheckBoxAutoRun.Size = new System.Drawing.Size(198, 16);
+			this.CheckBoxAutoRun.Size = new System.Drawing.Size(217, 16);
 			this.CheckBoxAutoRun.TabIndex = 2;
-			this.CheckBoxAutoRun.Text = "起動と同時にコメント表示を開始する";
+			this.CheckBoxAutoRun.Text = "起動と同時にコメント表示を開始する (&S)";
 			this.CheckBoxAutoRun.UseVisualStyleBackColor = true;
 			// 
 			// panel5
@@ -106,7 +110,7 @@
 			// panel1
 			// 
 			this.panel1.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-			this.panel1.Location = new System.Drawing.Point(0, 116);
+			this.panel1.Location = new System.Drawing.Point(0, 208);
 			this.panel1.Name = "panel1";
 			this.panel1.Size = new System.Drawing.Size(500, 5);
 			this.panel1.TabIndex = 6;
@@ -114,7 +118,7 @@
 			// label1
 			// 
 			this.label1.AutoSize = true;
-			this.label1.Location = new System.Drawing.Point(16, 112);
+			this.label1.Location = new System.Drawing.Point(16, 204);
 			this.label1.Name = "label1";
 			this.label1.Size = new System.Drawing.Size(75, 12);
 			this.label1.TabIndex = 7;
@@ -122,7 +126,7 @@
 			// 
 			// ButtonLog
 			// 
-			this.ButtonLog.Location = new System.Drawing.Point(184, 232);
+			this.ButtonLog.Location = new System.Drawing.Point(184, 324);
 			this.ButtonLog.Name = "ButtonLog";
 			this.ButtonLog.Size = new System.Drawing.Size(216, 28);
 			this.ButtonLog.TabIndex = 12;
@@ -132,7 +136,7 @@
 			// 
 			// label5
 			// 
-			this.label5.Location = new System.Drawing.Point(16, 208);
+			this.label5.Location = new System.Drawing.Point(16, 300);
 			this.label5.Name = "label5";
 			this.label5.Size = new System.Drawing.Size(376, 16);
 			this.label5.TabIndex = 11;
@@ -140,7 +144,7 @@
 			// 
 			// ButtonCheckRss
 			// 
-			this.ButtonCheckRss.Location = new System.Drawing.Point(184, 164);
+			this.ButtonCheckRss.Location = new System.Drawing.Point(184, 256);
 			this.ButtonCheckRss.Name = "ButtonCheckRss";
 			this.ButtonCheckRss.Size = new System.Drawing.Size(216, 28);
 			this.ButtonCheckRss.TabIndex = 10;
@@ -150,7 +154,7 @@
 			// 
 			// ProgressBarCheckRss
 			// 
-			this.ProgressBarCheckRss.Location = new System.Drawing.Point(16, 164);
+			this.ProgressBarCheckRss.Location = new System.Drawing.Point(16, 256);
 			this.ProgressBarCheckRss.MarqueeAnimationSpeed = 10;
 			this.ProgressBarCheckRss.Name = "ProgressBarCheckRss";
 			this.ProgressBarCheckRss.Size = new System.Drawing.Size(152, 28);
@@ -160,7 +164,7 @@
 			// 
 			// CheckBoxCheckRss
 			// 
-			this.CheckBoxCheckRss.Location = new System.Drawing.Point(16, 140);
+			this.CheckBoxCheckRss.Location = new System.Drawing.Point(16, 232);
 			this.CheckBoxCheckRss.Name = "CheckBoxCheckRss";
 			this.CheckBoxCheckRss.Size = new System.Drawing.Size(384, 16);
 			this.CheckBoxCheckRss.TabIndex = 8;
@@ -171,7 +175,7 @@
 			// panel2
 			// 
 			this.panel2.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-			this.panel2.Location = new System.Drawing.Point(0, 276);
+			this.panel2.Location = new System.Drawing.Point(0, 368);
 			this.panel2.Name = "panel2";
 			this.panel2.Size = new System.Drawing.Size(500, 5);
 			this.panel2.TabIndex = 13;
@@ -179,7 +183,7 @@
 			// ButtonCancel
 			// 
 			this.ButtonCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.ButtonCancel.Location = new System.Drawing.Point(304, 296);
+			this.ButtonCancel.Location = new System.Drawing.Point(304, 388);
 			this.ButtonCancel.Name = "ButtonCancel";
 			this.ButtonCancel.Size = new System.Drawing.Size(96, 28);
 			this.ButtonCancel.TabIndex = 15;
@@ -188,7 +192,7 @@
 			// 
 			// ButtonOK
 			// 
-			this.ButtonOK.Location = new System.Drawing.Point(184, 296);
+			this.ButtonOK.Location = new System.Drawing.Point(184, 388);
 			this.ButtonOK.Name = "ButtonOK";
 			this.ButtonOK.Size = new System.Drawing.Size(96, 28);
 			this.ButtonOK.TabIndex = 14;
@@ -200,13 +204,47 @@
 			// 
 			this.SaveFileDialogLog.Filter = "ログファイル|*.lga";
 			// 
+			// groupBox1
+			// 
+			this.groupBox1.Controls.Add(this.RadioButtonDownload);
+			this.groupBox1.Controls.Add(this.RadioButtonPush);
+			this.groupBox1.Location = new System.Drawing.Point(16, 112);
+			this.groupBox1.Name = "groupBox1";
+			this.groupBox1.Size = new System.Drawing.Size(384, 76);
+			this.groupBox1.TabIndex = 16;
+			this.groupBox1.TabStop = false;
+			this.groupBox1.Text = "ゆかりからのコメント受信方法";
+			// 
+			// RadioButtonDownload
+			// 
+			this.RadioButtonDownload.AutoSize = true;
+			this.RadioButtonDownload.Location = new System.Drawing.Point(16, 48);
+			this.RadioButtonDownload.Name = "RadioButtonDownload";
+			this.RadioButtonDownload.Size = new System.Drawing.Size(286, 16);
+			this.RadioButtonDownload.TabIndex = 1;
+			this.RadioButtonDownload.TabStop = true;
+			this.RadioButtonDownload.Text = "ダウンロード（プッシュ通知が動作しない場合はこちら）(&D)";
+			this.RadioButtonDownload.UseVisualStyleBackColor = true;
+			// 
+			// RadioButtonPush
+			// 
+			this.RadioButtonPush.AutoSize = true;
+			this.RadioButtonPush.Location = new System.Drawing.Point(16, 24);
+			this.RadioButtonPush.Name = "RadioButtonPush";
+			this.RadioButtonPush.Size = new System.Drawing.Size(132, 16);
+			this.RadioButtonPush.TabIndex = 0;
+			this.RadioButtonPush.TabStop = true;
+			this.RadioButtonPush.Text = "プッシュ通知（推奨）(&P)";
+			this.RadioButtonPush.UseVisualStyleBackColor = true;
+			// 
 			// FormSettings
 			// 
 			this.AcceptButton = this.ButtonOK;
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.ButtonCancel;
-			this.ClientSize = new System.Drawing.Size(414, 338);
+			this.ClientSize = new System.Drawing.Size(414, 431);
+			this.Controls.Add(this.groupBox1);
 			this.Controls.Add(this.ButtonCancel);
 			this.Controls.Add(this.ButtonOK);
 			this.Controls.Add(this.panel2);
@@ -228,8 +266,11 @@
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "FormSettings";
+			this.ShowInTaskbar = false;
 			this.Load += new System.EventHandler(this.FormSettings_Load);
 			this.Shown += new System.EventHandler(this.FormSettings_Shown);
+			this.groupBox1.ResumeLayout(false);
+			this.groupBox1.PerformLayout();
 			this.ResumeLayout(false);
 			this.PerformLayout();
 
@@ -253,5 +294,8 @@
 		private System.Windows.Forms.Button ButtonCancel;
 		private System.Windows.Forms.Button ButtonOK;
 		private System.Windows.Forms.SaveFileDialog SaveFileDialogLog;
+		private System.Windows.Forms.GroupBox groupBox1;
+		private System.Windows.Forms.RadioButton RadioButtonDownload;
+		private System.Windows.Forms.RadioButton RadioButtonPush;
 	}
 }

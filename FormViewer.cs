@@ -53,7 +53,7 @@ namespace YukkoView
 			// 連続投稿防止
 			if (oCommentInfo.CompareBase(mPrevCommentInfo) && oCommentInfo.InitialTick - mPrevCommentInfo.InitialTick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
 			{
-				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "連続投稿 [B] のため表示しません：" + oCommentInfo.Message);
+				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "連続投稿のため表示しません：" + oCommentInfo.Message);
 				return;
 			}
 			mPrevCommentInfo = oCommentInfo;

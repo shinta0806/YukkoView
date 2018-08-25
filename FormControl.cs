@@ -13,6 +13,8 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -110,12 +112,18 @@ namespace YukkoView
 		private readonly Color COLOR_STATUS_RUNNING = Color.LimeGreen;
 		private readonly Color COLOR_STATUS_STOP = Color.Black;
 
+		// 古すぎて無視するコメントの閾値 [時間]
+		private const Int32 IGNORE_HOUR = 12;
+
 		// テストコメント投稿用の色
 		private readonly Color[] COLOR_TEST_COMMENTS = { Color.White, Color.Gray, Color.Pink, Color.Red, Color.Orange, Color.Yellow,
 				Color.Lime, Color.Cyan, Color.Blue, Color.Purple, Color.FromArgb(255, 0x11, 0x11, 0x11) };
 
-		// コメントサーバーから取得するコメントの長さの最大値（全角半角関係ない）
-		private const Int32 MAX_COMMENT_MESSAGE_LEN = 18;
+		// TCP タイムアウト [ms]
+		private const Int32 TCP_TIMEOUT = 5 * 1000;
+
+		// コメント識別子
+		private const String COMMENT_BEGIN_MARK = "Comment=";
 
 		// ログ用
 		private const String TRACE_SOURCE_NAME = "Ycv";
@@ -163,33 +171,123 @@ namespace YukkoView
 		// ====================================================================
 
 		// --------------------------------------------------------------------
-		// コメントサーバーからコメントをダウンロード
-		// 長いコメント "A...B..." を 2 回ユーザーが投稿した場合、サーバーからダウンロードすると
-		// "A..." "B..." "A..." "B..." の順番になる場合と、"A..." "A..." "B..." "B..." の
-		// 順番になる場合の両方があるので、連続防止は分割・統合それぞれで検出する
-		// 分割の連続防止は DownloadComment() で検出し、統合の連続防止は
-		// FormViewer.AddComment() で検出する
-		// 何度も高速で連続投稿されると防止しきれない
+		// バイト列からを解析
 		// --------------------------------------------------------------------
-		private async Task DownloadComment()
+		private CommentInfo AnalyzeCommentData(Byte[] oArray)
 		{
-			await Task.Run(() =>
+			// 先頭の改行を無視する
+			Int32 aBeginPos = 0;
+			while (aBeginPos < oArray.Length && (oArray[aBeginPos] == '\r' || oArray[aBeginPos] == '\n'))
+			{
+				aBeginPos++;
+			}
+			if (aBeginPos == oArray.Length)
+			{
+				// コメントの中身が無い
+				return null;
+			}
+
+			// 文字列を解析してコメント情報化
+			CommentInfo aCommentInfo;
+			if (oArray[aBeginPos] == 'X')
+			{
+				aCommentInfo = AnalyzeExtendedCommentData(oArray, aBeginPos);
+			}
+			else
+			{
+				aCommentInfo = AnalyzeOldFormatCommentData(oArray, aBeginPos);
+			}
+			return aCommentInfo;
+		}
+
+		// --------------------------------------------------------------------
+		// 拡張コメント文字列を解析
+		// --------------------------------------------------------------------
+		private CommentInfo AnalyzeExtendedCommentData(Byte[] oArray, Int32 oBeginPos)
+		{
+			return AnalyzeExtendedCommentData(Encoding.UTF8.GetString(oArray, oBeginPos, oArray.Length - oBeginPos));
+		}
+
+		// --------------------------------------------------------------------
+		// 拡張コメント文字列を解析
+		// --------------------------------------------------------------------
+		private CommentInfo AnalyzeExtendedCommentData(String oComment)
+		{
+			mLogWriter.ShowLogMessage(TraceEventType.Verbose, "AnalyzeExtendedCommentData() oComment: " + oComment);
+
+			// 拡張バージョン識別子の確認
+			if (oComment.Substring(1, 1) != "3")
+			{
+				throw new Exception("未対応の拡張コメントフォーマットです。");
+			}
+
+			// 古いコメントは無視
+			DateTime aCommentTime = DateTime.ParseExact(oComment.Substring(9, 19), "yyyy-MM-dd HH:mm:ss", null);
+			String aCommentMessage = oComment.Substring(28, oComment.Length - 29);
+			if (DateTime.Now.Subtract(aCommentTime) >= new TimeSpan(IGNORE_HOUR, 0, 0))
+			{
+				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, IGNORE_HOUR + "時間以上経過しているコメントを無視します：" + aCommentMessage);
+				return null;
+			}
+
+			CommentInfo aCommentInfo = new CommentInfo();
+			aCommentInfo.Message = aCommentMessage;
+			aCommentInfo.YukariSize = Int32.Parse(oComment.Substring(2, 1));
+			aCommentInfo.Color = Color.FromArgb((Int32)(Convert.ToInt32(oComment.Substring(3, 6), 16) | 0xFF000000));
+			aCommentInfo.InitialTick = Environment.TickCount;
+			return aCommentInfo;
+		}
+
+		// --------------------------------------------------------------------
+		// 旧仕様コメント文字列を解析
+		// --------------------------------------------------------------------
+		private CommentInfo AnalyzeOldFormatCommentData(Byte[] oArray, Int32 oBeginPos)
+		{
+			String aComment = Encoding.GetEncoding(Common.CODE_PAGE_SHIFT_JIS).GetString(oArray, oBeginPos, oArray.Length - oBeginPos);
+			mLogWriter.ShowLogMessage(TraceEventType.Verbose, "AnalyzeOldFormatCommentData() aComment: " + aComment);
+
+			if (aComment == "nothing" || aComment.Length <= 7)
+			{
+				return null;
+			}
+
+			CommentInfo aCommentInfo = new CommentInfo();
+			aCommentInfo.Message = aComment.Substring(7, aComment.Length - 8);
+			aCommentInfo.YukariSize = Int32.Parse(aComment.Substring(0, 1));
+			aCommentInfo.Color = Color.FromArgb((Int32)(Convert.ToInt32(aComment.Substring(1, 6), 16) | 0xFF000000));
+			aCommentInfo.InitialTick = Environment.TickCount;
+			return aCommentInfo;
+		}
+
+		// --------------------------------------------------------------------
+		// mIsCommentReceiveError をクリア
+		// --------------------------------------------------------------------
+		private void ClearIsCommentReceiveError()
+		{
+			if (mIsCommentReceiveError)
+			{
+				mIsCommentReceiveError = false;
+				UpdateStatusLabels();
+			}
+		}
+
+		// --------------------------------------------------------------------
+		// コメントサーバーからコメントをダウンロード
+		// --------------------------------------------------------------------
+		private Task DownloadComment()
+		{
+			return Task.Run(() =>
 			{
 				try
 				{
-					// 終了時に強制終了されないように設定
-					Thread.CurrentThread.IsBackground = false;
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントダウンロード開始");
 
 					// ダウンロード
 					Downloader aDownloader = new Downloader();
 					aDownloader.CancellationToken = mClosingCancellationTokenSource.Token;
 
-					CommentInfo aPoolCommentInfo = null;
 					for (; ; )
 					{
-						CommentInfo aPrevCommentInfo = null;
-						Int32 aInitialTick = Environment.TickCount;
-
 						try
 						{
 							// サーバーに溜まっているコメントをすべて読み込む
@@ -205,96 +303,40 @@ namespace YukkoView
 								Thread.Sleep(Common.GENERAL_SLEEP_TIME);
 
 								// ダウンロード
-								String aComment = aDownloader.Download(mYukkoViewSettings.ServerUrl + "?r="
-										+ HttpUtility.UrlEncode(mYukkoViewSettings.RoomName, Encoding.UTF8),
-										Encoding.GetEncoding(Common.CODE_PAGE_SHIFT_JIS));
-								aComment = aComment.TrimStart(new Char[] { '\r', '\n' });
-
-								// サーバーとの通信に成功したのでエラー表示解除
-								if (mIsCommentReceiveError)
+								Byte[] aArray;
+								using (MemoryStream aMemStream = new MemoryStream())
 								{
-									mIsCommentReceiveError = false;
-									UpdateStatusLabels();
+									aDownloader.Download(mYukkoViewSettings.ServerUrl + "?r=" + HttpUtility.UrlEncode(mYukkoViewSettings.RoomName, Encoding.UTF8) + "&v=3",
+											aMemStream);
+									aArray = aMemStream.ToArray();
+								}
+								if (aArray.Length == 0)
+								{
+									throw new Exception("コメントサーバーのデータが空です。");
 								}
 
-								if (aComment == "nothing" || aComment.Length <= 7)
+								// サーバーとの通信に成功したのでエラー表示解除
+								ClearIsCommentReceiveError();
+
+								// コメント
+								CommentInfo aCommentInfo = AnalyzeCommentData(aArray);
+								if (aCommentInfo == null)
 								{
 									// 溜まっているコメントが無くなった
 									break;
 								}
-
-								// 平文を解析してコメント情報化
-								CommentInfo aCommentInfo = new CommentInfo();
-								aCommentInfo.Message = aComment.Substring(7, aComment.Length - 8);
-								aCommentInfo.YukariSize = Int32.Parse(aComment.Substring(0, 1));
-								aCommentInfo.Color = Color.FromArgb((Int32)(Convert.ToInt32(aComment.Substring(1, 6), 16) | 0xFF000000));
-								aCommentInfo.InitialTick = aInitialTick;
 								mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントをダウンロードしました：" + aCommentInfo.Message);
 
-								// 直前の（結合前の）コメントと重複していないか確認
-								if (aCommentInfo.CompareBase(aPrevCommentInfo) && aCommentInfo.InitialTick - aPrevCommentInfo.InitialTick <= YukkoViewCommon.CONTINUOUS_PREVENT_TIME)
-								{
-									mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "連続投稿 [A] のため表示しません：" + aCommentInfo.Message);
-									continue;
-								}
-								aPrevCommentInfo = aCommentInfo;
-
-								if (aPoolCommentInfo != null && (aPoolCommentInfo.YukariSize != aCommentInfo.YukariSize || aPoolCommentInfo.Color != aCommentInfo.Color))
-								{
-									// プールされているコメントと装飾が違うので、プールされているコメントを確定し発行
-									mFormViewer.AddComment(aPoolCommentInfo);
-									aPoolCommentInfo = null;
-								}
-
-								if (aPoolCommentInfo == null)
-								{
-									if (aCommentInfo.Message.Length == MAX_COMMENT_MESSAGE_LEN)
-									{
-										// プールされているコメントが無く、最大長コメントが来たので、今回のを新規にプール
-										aPoolCommentInfo = aCommentInfo;
-									}
-									else
-									{
-										// 今回のコメントを即時発行
-										mFormViewer.AddComment(aCommentInfo);
-									}
-								}
-								else
-								{
-									if (aCommentInfo.Message.Length == MAX_COMMENT_MESSAGE_LEN)
-									{
-										// プールされているコメントがあり、最大長コメントが来たので、今回のをプールに追加
-										aPoolCommentInfo.Message += aCommentInfo.Message;
-									}
-									else
-									{
-										// プールされているコメントと今回のコメントを即時発行
-										aPoolCommentInfo.Message += aCommentInfo.Message;
-										mFormViewer.AddComment(aPoolCommentInfo);
-										aPoolCommentInfo = null;
-									}
-								}
-
+								// コメント発行
+								mFormViewer.AddComment(aCommentInfo);
 							}
 
 						}
 						catch (Exception oExcep)
 						{
 							mLogWriter.LogMessage(TraceEventType.Error, "ダウンロードエラー（リトライします）：\n" + oExcep.Message);
-
-							// エラー表示
-							if (!mIsCommentReceiveError)
-							{
-								mIsCommentReceiveError = true;
-								UpdateStatusLabels();
-							}
-						}
-
-						// 前回休憩以前のコメントがプールされているなら発行する
-						if (aPoolCommentInfo != null && Environment.TickCount - aPoolCommentInfo.InitialTick > mYukkoViewSettings.Interval)
-						{
-							mFormViewer.AddComment(aPoolCommentInfo);
-							aPoolCommentInfo = null;
+							mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
+							EnableIsCommentReceiveError();
 						}
 
 						// しばらく休憩
@@ -315,6 +357,18 @@ namespace YukkoView
 				}
 			});
 
+		}
+
+		// --------------------------------------------------------------------
+		// mIsCommentReceiveError を立てる
+		// --------------------------------------------------------------------
+		private void EnableIsCommentReceiveError()
+		{
+			if (!mIsCommentReceiveError)
+			{
+				mIsCommentReceiveError = true;
+				UpdateStatusLabels();
+			}
 		}
 
 		// --------------------------------------------------------------------
@@ -490,6 +544,134 @@ namespace YukkoView
 		}
 
 		// --------------------------------------------------------------------
+		// コメントサーバーからプッシュ通知を受信
+		// --------------------------------------------------------------------
+		private Task ReceivePushComment()
+		{
+			return Task.Run(() =>
+			{
+				TcpListener aListener = null;
+				try
+				{
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントプッシュ受信開始");
+
+					// IPv4 と IPv6 の全ての IP アドレスを Listen する
+					aListener = new TcpListener(IPAddress.IPv6Any, mYukkoViewSettings.ReceivePushPort);
+					aListener.Server.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, 0);
+					aListener.Start();
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "IP アドレス：" + ((IPEndPoint)aListener.LocalEndpoint).Address
+							+ ", ポート：" + ((IPEndPoint)aListener.LocalEndpoint).Port);
+
+					for (; ; )
+					{
+						try
+						{
+							// 接続要求があったら受け入れる
+							TcpClient aClient = aListener.AcceptTcpClient();
+
+							String aReceivedString;
+							using (NetworkStream aNetworkStream = aClient.GetStream())
+							{
+								// ネットワークストリームの設定
+								aNetworkStream.ReadTimeout = TCP_TIMEOUT;
+								aNetworkStream.WriteTimeout = TCP_TIMEOUT;
+
+								// クライアントから送られたデータを受信する
+								Boolean aDisconnected = false;
+								using (MemoryStream aMemoryStream = new MemoryStream())
+								{
+									Byte[] aReceived = new Byte[1024];
+									Int32 aReceivedSize = 0;
+									do
+									{
+										aReceivedSize = aNetworkStream.Read(aReceived, 0, aReceived.Length);
+										if (aReceivedSize == 0)
+										{
+											// クライアントが切断したと判断
+											aDisconnected = true;
+											break;
+										}
+
+										// 受信したデータを蓄積する
+										aMemoryStream.Write(aReceived, 0, aReceivedSize);
+									} while (aNetworkStream.DataAvailable);
+
+									//aReceivedString = Encoding.UTF8.GetString(aMemoryStream.GetBuffer(), 0, (Int32)aMemoryStream.Length);
+									aReceivedString = HttpUtility.UrlDecode(aMemoryStream.GetBuffer(), 0, (Int32)aMemoryStream.Length, Encoding.UTF8);
+								}
+
+								if (!aDisconnected)
+								{
+									// クライアントに応答を返す
+									String aBody = "OK";
+									String aHeader = "HTTP/1.1 200 OK\n"
+											+ "Content-Length: " + aBody.Length + "\n"
+											+ "Content-Type: text/html\n\n";
+									String aSendString = aHeader + aBody;
+									Byte[] aSendBytes = Encoding.UTF8.GetBytes(aSendString);
+									aNetworkStream.Write(aSendBytes, 0, aSendBytes.Length);
+								}
+							}
+
+							// コメントを取り出す
+							Int32 aCommentPos = aReceivedString.IndexOf(COMMENT_BEGIN_MARK);
+							if (aCommentPos < 0)
+							{
+								throw new Exception("コメントデータが見つかりません。");
+							}
+							if (aCommentPos + COMMENT_BEGIN_MARK.Length == aReceivedString.Length)
+							{
+								throw new Exception("コメントデータが空です。");
+							}
+							String aComment = aReceivedString.Substring(aCommentPos + COMMENT_BEGIN_MARK.Length);
+
+
+							// サーバーとの通信に成功したのでエラー表示解除
+							ClearIsCommentReceiveError();
+
+							// コメント発行
+							CommentInfo aCommentInfo = AnalyzeExtendedCommentData(aComment);
+							if (aCommentInfo != null)
+							{
+								mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントを受信しました：" + aCommentInfo.Message);
+								mFormViewer.AddComment(aCommentInfo);
+							}
+
+							// 閉じる
+							aClient.Close();
+						}
+						catch (Exception oExcep)
+						{
+							mLogWriter.LogMessage(TraceEventType.Error, "コメント受信エラー（リトライします）：\n" + oExcep.Message);
+							mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
+							EnableIsCommentReceiveError();
+						}
+
+						mStopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+						mClosingCancellationTokenSource.Token.ThrowIfCancellationRequested();
+					}
+				}
+				catch (OperationCanceledException)
+				{
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "プッシュ受信処理を終了しました。");
+				}
+				catch (Exception oExcep)
+				{
+					mLogWriter.ShowLogMessage(TraceEventType.Error, "プッシュ受信エラー：\n" + oExcep.Message);
+					mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
+				}
+				finally
+				{
+					if (aListener != null)
+					{
+						aListener.Stop();
+					}
+				}
+			});
+
+		}
+
+		// --------------------------------------------------------------------
 		// ファイル監視設定
 		// --------------------------------------------------------------------
 		private void SetFileSystemWatcherYukariConfig()
@@ -569,9 +751,8 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		// コメント表示開始
 		// --------------------------------------------------------------------
-		private async Task Start()
+		private Task Start()
 		{
-			mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメント表示開始");
 			mIsRunning = true;
 			mIsCommentReceiveError = false;
 			UpdateStatusLabels();
@@ -589,7 +770,43 @@ namespace YukkoView
 			// コメントサーバーからコメントを受信
 			mStopCancellationTokenSource.Dispose();
 			mStopCancellationTokenSource = new CancellationTokenSource();
-			await DownloadComment();
+			if (mYukkoViewSettings.ReceivePush)
+			{
+				return ReceivePushComment();
+			}
+			else
+			{
+				return DownloadComment();
+			}
+		}
+
+		// --------------------------------------------------------------------
+		// コメント表示停止
+		// --------------------------------------------------------------------
+		private void Stop()
+		{
+			mIsRunning = false;
+			UpdateStatusLabels();
+			UpdatePlayerButtons();
+			mFormViewer.Stop();
+
+			mStopCancellationTokenSource.Cancel();
+
+			if (mYukkoViewSettings.ReceivePush)
+			{
+				// ダミーコメントを投稿してプッシュ受信を終了させる
+				TcpClient aClient = new TcpClient("localhost", mYukkoViewSettings.ReceivePushPort);
+				using (NetworkStream aNetworkStream = aClient.GetStream())
+				{
+					aNetworkStream.ReadTimeout = TCP_TIMEOUT;
+					aNetworkStream.WriteTimeout = TCP_TIMEOUT;
+					Byte[] aSendBytes = Encoding.UTF8.GetBytes("X30FFFFFF1900-01-01 00:00:00 \t");
+					aNetworkStream.Write(aSendBytes, 0, aSendBytes.Length);
+				}
+				aClient.Close();
+			}
+
+			mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメント表示終了");
 		}
 
 		// --------------------------------------------------------------------
@@ -891,13 +1108,7 @@ namespace YukkoView
 		{
 			try
 			{
-				mIsRunning = false;
-				UpdateStatusLabels();
-				UpdatePlayerButtons();
-				mFormViewer.Stop();
-
-				mStopCancellationTokenSource.Cancel();
-				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメント表示終了");
+				Stop();
 			}
 			catch (Exception oExcep)
 			{
@@ -1036,29 +1247,44 @@ namespace YukkoView
 
 		}
 
-		private void ButtonSettings_Click(object sender, EventArgs e)
+		private async void ButtonSettings_Click(object sender, EventArgs e)
 		{
 			try
 			{
+				Boolean aIsRunningBak = mIsRunning;
+
 				using (FormSettings aFormSettings = new FormSettings(mLogWriter))
 				{
 					// ApplicationSettingsBase が [SerializableAttribute] ではないので DeepClone() が使えない
 					// YukkoViewSettings が参照型を持った時は注意
 					aFormSettings.YukkoViewSettings = mYukkoViewSettings.Clone();
 
-					// 設定時はビューアウィンドウを非表示にする
+					// 設定時はビューアウィンドウを非表示にする、コメントは停止する
 					mFormViewer.Hide();
+					if (aIsRunningBak)
+					{
+						Stop();
+					}
 					DialogResult aResult = aFormSettings.ShowDialog(this);
+					Task aTask = null;
+					if (aIsRunningBak)
+					{
+						aTask = Start();
+					}
 					mFormViewer.Show();
 
 					// 値の更新
-					if (aResult != DialogResult.OK)
+					if (aResult == DialogResult.OK)
 					{
-						return;
+						mYukkoViewSettings = aFormSettings.YukkoViewSettings;
+						mYukkoViewSettings.Save();
 					}
-					mYukkoViewSettings = aFormSettings.YukkoViewSettings;
-					mYukkoViewSettings.Save();
 
+					// コメント開始タスクの手綱を握る
+					if (aTask != null)
+					{
+						await aTask;
+					}
 				}
 			}
 			catch (Exception oExcep)

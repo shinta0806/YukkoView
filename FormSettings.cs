@@ -104,6 +104,7 @@ namespace YukkoView
 			YukkoViewSettings.AutoRun = CheckBoxAutoRun.Checked;
 			YukkoViewSettings.EnableMargin = CheckBoxEnableMargin.Checked;
 			YukkoViewSettings.MarginPercent = Int32.Parse(TextBoxMarginPercent.Text);
+			YukkoViewSettings.ReceivePush = RadioButtonPush.Checked;
 			YukkoViewSettings.CheckRss = CheckBoxCheckRss.Checked;
 		}
 
@@ -139,6 +140,16 @@ namespace YukkoView
 			CheckBoxEnableMargin.Checked = YukkoViewSettings.EnableMargin;
 			TextBoxMarginPercent.Text = YukkoViewSettings.MarginPercent.ToString();
 			UpdateTextBoxMarginPercent();
+
+			// コメント受信方法
+			if (YukkoViewSettings.ReceivePush)
+			{
+				RadioButtonPush.Checked = true;
+			}
+			else
+			{
+				RadioButtonDownload.Checked = true;
+			}
 
 			// RSS
 			CheckBoxCheckRss.Checked = YukkoViewSettings.CheckRss;
