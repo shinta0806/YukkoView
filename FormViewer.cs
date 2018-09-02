@@ -731,7 +731,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "ディスプレイ切り替え時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void TimerTopMost_Tick(object sender, EventArgs e)

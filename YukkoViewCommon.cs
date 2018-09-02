@@ -44,8 +44,9 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		// アプリの基本情報
 		// --------------------------------------------------------------------
+		public const String APP_ID = "YukkoView";
 		public const String APP_NAME_J = "ゆっこビュー";
-		public const String APP_VER = "Ver 2.52";
+		public const String APP_VER = "Ver 2.62";
 		public const String COPYRIGHT_J = "Copyright (C) 2017-2018 by SHINTA";
 
 		// --------------------------------------------------------------------
@@ -63,9 +64,6 @@ namespace YukkoView.Shared
 		// ファイル名・フォルダー名
 		// --------------------------------------------------------------------
 
-		// ヘルプファイル名
-		public const String FILE_NAME_HELP = "YukkoView_JPN.html";
-
 		// ちょちょいと自動更新の設定ファイル
 		public const String FILE_NAME_RSS_INI = "YukkoView_Latest.config";
 
@@ -73,7 +71,7 @@ namespace YukkoView.Shared
 		public const String FOLDER_NAME_CUPDATER = "Updater\\";
 
 		// 設定用フォルダー名
-		public const String FOLDER_NAME_YUKKOVIEW = "YukkoView\\";
+		public const String FOLDER_NAME_YUKKOVIEW = APP_ID + "\\";
 
 		// --------------------------------------------------------------------
 		// ゆかり関連
@@ -97,13 +95,20 @@ namespace YukkoView.Shared
 		public const Int32 CONTINUOUS_PREVENT_TIME = 5000;
 
 		// ====================================================================
+		// public プロパティー
+		// ====================================================================
+
+		// ログ
+		public static LogWriter LogWriter { get; set; }
+
+		// ====================================================================
 		// public メンバー関数
 		// ====================================================================
 
 		// --------------------------------------------------------------------
 		// ちょちょいと自動更新を起動
 		// --------------------------------------------------------------------
-		public static Boolean LaunchUpdater(Boolean oCheckLatest, Boolean oForceShow, IntPtr oHWnd, Boolean oClearUpdateCache, Boolean oForceInstall, LogWriter oLogWriter)
+		public static Boolean LaunchUpdater(Boolean oCheckLatest, Boolean oForceShow, IntPtr oHWnd, Boolean oClearUpdateCache, Boolean oForceInstall)
 		{
 			// 固定部分
 			UpdaterLauncher aUpdaterLauncher = new UpdaterLauncher();
@@ -118,7 +123,7 @@ namespace YukkoView.Shared
 			{
 				aUpdaterLauncher.LatestRss = "http://shinta.coresv.com/soft/YukkoView_JPN.xml";
 			}
-			aUpdaterLauncher.LogWriter = oLogWriter;
+			aUpdaterLauncher.LogWriter = LogWriter;
 			aUpdaterLauncher.ForceShow = oForceShow;
 			aUpdaterLauncher.NotifyHWnd = oHWnd;
 			aUpdaterLauncher.ClearUpdateCache = oClearUpdateCache;
@@ -131,10 +136,10 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		// 環境情報をログする
 		// --------------------------------------------------------------------
-		public static void LogEnvironmentInfo(LogWriter oLogWriter)
+		public static void LogEnvironmentInfo()
 		{
 			SystemEnvironment aSE = new SystemEnvironment();
-			aSE.LogEnvironment(oLogWriter);
+			aSE.LogEnvironment(LogWriter);
 		}
 
 		// --------------------------------------------------------------------
@@ -158,17 +163,50 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		// ヘルプの表示
 		// --------------------------------------------------------------------
-		public static void ShowHelp(LogWriter oLogWriter)
+		public static void ShowHelp(String oAnchor = null)
 		{
+			String aHelpPath = null;
+
 			try
 			{
-				Process.Start(Path.GetDirectoryName(Application.ExecutablePath) + "\\" + FILE_NAME_HELP);
+				String aHelpPathBase = Path.GetDirectoryName(Application.ExecutablePath) + "\\";
+
+				// アンカーが指定されている場合は状況依存型ヘルプを表示
+				if (!String.IsNullOrEmpty(oAnchor))
+				{
+					aHelpPath = aHelpPathBase + FOLDER_NAME_HELP_PARTS + FILE_NAME_HELP_PREFIX + "_" + oAnchor + Common.FILE_EXT_HTML;
+					try
+					{
+						Process.Start(aHelpPath);
+						return;
+					}
+					catch (Exception oExcep)
+					{
+						LogWriter.ShowLogMessage(TraceEventType.Error, "状況に応じたヘルプを表示できませんでした：\n" + oExcep.Message + "\n" + aHelpPath
+								+ "\n通常のヘルプを表示します。");
+					}
+				}
+
+				// アンカーが指定されていない場合・状況依存型ヘルプを表示できなかった場合は通常のヘルプを表示
+				aHelpPath = aHelpPathBase + FILE_NAME_HELP_PREFIX + Common.FILE_EXT_HTML;
+				Process.Start(aHelpPath);
 			}
-			catch (Exception)
+			catch (Exception oExcep)
 			{
-				oLogWriter.ShowLogMessage(TraceEventType.Error, "ヘルプを表示できませんでした。\n" + FILE_NAME_HELP);
+				LogWriter.ShowLogMessage(TraceEventType.Error, "ヘルプを表示できませんでした。\n" + oExcep.Message + "\n" + aHelpPath);
 			}
 		}
+
+		// ====================================================================
+		// private 定数
+		// ====================================================================
+
+		// --------------------------------------------------------------------
+		// ファイル名
+		// --------------------------------------------------------------------
+		private const String FILE_NAME_HELP_PREFIX = APP_ID + "_JPN";
+		private const String FOLDER_NAME_HELP_PARTS = "HelpParts\\";
+
 
 
 	} // public class YukkoViewCommon

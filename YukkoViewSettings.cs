@@ -334,8 +334,10 @@ namespace YukkoView.Shared
 			return RssCheckDate == aEmptyDate || DateTime.Now.Date - RssCheckDate >= aDay3;
 		}
 
-	} // public class YukariCommentViewerSettings
+	} 
+	// public class YukkoViewSettings
 
-} // namespace YukkoView.Shared
+} 
+// namespace YukkoView.Shared
 
 

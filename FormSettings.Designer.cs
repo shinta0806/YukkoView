@@ -49,6 +49,7 @@
 			this.groupBox1 = new System.Windows.Forms.GroupBox();
 			this.RadioButtonDownload = new System.Windows.Forms.RadioButton();
 			this.RadioButtonPush = new System.Windows.Forms.RadioButton();
+			this.LinkLabelHelp = new System.Windows.Forms.LinkLabel();
 			this.groupBox1.SuspendLayout();
 			this.SuspendLayout();
 			// 
@@ -206,6 +207,7 @@
 			// 
 			// groupBox1
 			// 
+			this.groupBox1.Controls.Add(this.LinkLabelHelp);
 			this.groupBox1.Controls.Add(this.RadioButtonDownload);
 			this.groupBox1.Controls.Add(this.RadioButtonPush);
 			this.groupBox1.Location = new System.Drawing.Point(16, 112);
@@ -236,6 +238,17 @@
 			this.RadioButtonPush.TabStop = true;
 			this.RadioButtonPush.Text = "プッシュ通知（推奨）(&P)";
 			this.RadioButtonPush.UseVisualStyleBackColor = true;
+			// 
+			// LinkLabelHelp
+			// 
+			this.LinkLabelHelp.Location = new System.Drawing.Point(152, 24);
+			this.LinkLabelHelp.Name = "LinkLabelHelp";
+			this.LinkLabelHelp.Size = new System.Drawing.Size(64, 16);
+			this.LinkLabelHelp.TabIndex = 25;
+			this.LinkLabelHelp.TabStop = true;
+			this.LinkLabelHelp.Text = "詳細情報";
+			this.LinkLabelHelp.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+			this.LinkLabelHelp.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.LinkLabelHelp_LinkClicked);
 			// 
 			// FormSettings
 			// 
@@ -297,5 +310,6 @@
 		private System.Windows.Forms.GroupBox groupBox1;
 		private System.Windows.Forms.RadioButton RadioButtonDownload;
 		private System.Windows.Forms.RadioButton RadioButtonPush;
+		private System.Windows.Forms.LinkLabel LinkLabelHelp;
 	}
 }

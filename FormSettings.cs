@@ -28,9 +28,6 @@ namespace YukkoView
 		// public プロパティー
 		// ====================================================================
 
-		// 設定
-		public YukkoViewSettings YukkoViewSettings { get; set; }
-
 		// ====================================================================
 		// コンストラクター・デストラクター
 		// ====================================================================
@@ -38,10 +35,12 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		// コンストラクター
 		// --------------------------------------------------------------------
-		public FormSettings(LogWriter oLogWriter)
+		public FormSettings(YukkoViewSettings oYukkoViewSettings, LogWriter oLogWriter)
 		{
 			InitializeComponent();
 
+			// 変数初期化
+			mYukkoViewSettings = oYukkoViewSettings;
 			mLogWriter = oLogWriter;
 		}
 
@@ -65,6 +64,9 @@ namespace YukkoView
 		// ====================================================================
 		// private メンバー変数
 		// ====================================================================
+
+		// 環境設定
+		private YukkoViewSettings mYukkoViewSettings;
 
 		// ログ
 		private LogWriter mLogWriter;
@@ -94,18 +96,17 @@ namespace YukkoView
 
 		// --------------------------------------------------------------------
 		// コンポーネントから設定を取得
-		// ＜例外＞ Exception
 		// --------------------------------------------------------------------
 		private void CompoToSettings()
 		{
-			CheckInput();
+			// 環境設定
+			mYukkoViewSettings.AutoRun = CheckBoxAutoRun.Checked;
+			mYukkoViewSettings.EnableMargin = CheckBoxEnableMargin.Checked;
+			mYukkoViewSettings.MarginPercent = Int32.Parse(TextBoxMarginPercent.Text);
+			mYukkoViewSettings.ReceivePush = RadioButtonPush.Checked;
 
-			// 格納
-			YukkoViewSettings.AutoRun = CheckBoxAutoRun.Checked;
-			YukkoViewSettings.EnableMargin = CheckBoxEnableMargin.Checked;
-			YukkoViewSettings.MarginPercent = Int32.Parse(TextBoxMarginPercent.Text);
-			YukkoViewSettings.ReceivePush = RadioButtonPush.Checked;
-			YukkoViewSettings.CheckRss = CheckBoxCheckRss.Checked;
+			// メンテナンス
+			mYukkoViewSettings.CheckRss = CheckBoxCheckRss.Checked;
 		}
 
 		// --------------------------------------------------------------------
@@ -134,15 +135,15 @@ namespace YukkoView
 		private void SettingsToCompo()
 		{
 			// 起動コメント開始
-			CheckBoxAutoRun.Checked = YukkoViewSettings.AutoRun;
+			CheckBoxAutoRun.Checked = mYukkoViewSettings.AutoRun;
 
 			// 上下マージン
-			CheckBoxEnableMargin.Checked = YukkoViewSettings.EnableMargin;
-			TextBoxMarginPercent.Text = YukkoViewSettings.MarginPercent.ToString();
+			CheckBoxEnableMargin.Checked = mYukkoViewSettings.EnableMargin;
+			TextBoxMarginPercent.Text = mYukkoViewSettings.MarginPercent.ToString();
 			UpdateTextBoxMarginPercent();
 
 			// コメント受信方法
-			if (YukkoViewSettings.ReceivePush)
+			if (mYukkoViewSettings.ReceivePush)
 			{
 				RadioButtonPush.Checked = true;
 			}
@@ -152,7 +153,7 @@ namespace YukkoView
 			}
 
 			// RSS
-			CheckBoxCheckRss.Checked = YukkoViewSettings.CheckRss;
+			CheckBoxCheckRss.Checked = mYukkoViewSettings.CheckRss;
 		}
 
 		// --------------------------------------------------------------------
@@ -247,11 +248,13 @@ namespace YukkoView
 		{
 			try
 			{
+				CheckInput();
 				CompoToSettings();
+				mYukkoViewSettings.Save();
 
 				// RSS チェックが無効になっていた場合は RSS 状態ファイルを削除
 				// 再度有効にされた時に、たまってた更新情報がどばっと表示されるのを防止するため
-				if (!YukkoViewSettings.CheckRss)
+				if (!mYukkoViewSettings.CheckRss)
 				{
 					try
 					{
@@ -276,7 +279,7 @@ namespace YukkoView
 			try
 			{
 				MakeLatestComposRunning();
-				if (!YukkoViewCommon.LaunchUpdater(true, true, Handle, true, false, mLogWriter))
+				if (!YukkoViewCommon.LaunchUpdater(true, true, Handle, true, false))
 				{
 					MakeAllComposNormal();
 				}
@@ -286,7 +289,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "最新情報確認時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void ButtonLog_Click(object sender, EventArgs e)
@@ -300,7 +302,7 @@ namespace YukkoView
 				}
 
 				// 環境情報保存
-				YukkoViewCommon.LogEnvironmentInfo(mLogWriter);
+				YukkoViewCommon.LogEnvironmentInfo();
 
 				ZipFile.CreateFromDirectory(YukkoViewCommon.SettingsPath(), SaveFileDialogLog.FileName, CompressionLevel.Optimal, true);
 				mLogWriter.ShowLogMessage(TraceEventType.Information, "ログ保存完了：\n" + SaveFileDialogLog.FileName);
@@ -310,7 +312,19 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "ログ保存時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
+		}
 
+		private void LinkLabelHelp_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+		{
+			try
+			{
+				YukkoViewCommon.ShowHelp("YukarikaranoCommentjushinhouhou");
+			}
+			catch (Exception oExcep)
+			{
+				mLogWriter.ShowLogMessage(TraceEventType.Error, "詳細情報リンククリック時エラー：\n" + oExcep.Message);
+				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
+			}
 		}
 	}
 }

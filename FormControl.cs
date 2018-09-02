@@ -213,8 +213,6 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		private CommentInfo AnalyzeExtendedCommentData(String oComment)
 		{
-			mLogWriter.ShowLogMessage(TraceEventType.Verbose, "AnalyzeExtendedCommentData() oComment: " + oComment);
-
 			// 拡張バージョン識別子の確認
 			if (oComment.Substring(1, 1) != "3")
 			{
@@ -244,7 +242,6 @@ namespace YukkoView
 		private CommentInfo AnalyzeOldFormatCommentData(Byte[] oArray, Int32 oBeginPos)
 		{
 			String aComment = Encoding.GetEncoding(Common.CODE_PAGE_SHIFT_JIS).GetString(oArray, oBeginPos, oArray.Length - oBeginPos);
-			mLogWriter.ShowLogMessage(TraceEventType.Verbose, "AnalyzeOldFormatCommentData() aComment: " + aComment);
 
 			if (aComment == "nothing" || aComment.Length <= 7)
 			{
@@ -274,7 +271,27 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		// コメントサーバーからコメントをダウンロード
 		// --------------------------------------------------------------------
-		private Task DownloadComment()
+		private Byte[] DownloadComment(Downloader oDownloader)
+		{
+			Byte[] aArray;
+			using (MemoryStream aMemStream = new MemoryStream())
+			{
+				oDownloader.Download(mYukkoViewSettings.ServerUrl + "?r=" + HttpUtility.UrlEncode(mYukkoViewSettings.RoomName, Encoding.UTF8) + "&v=3",
+						aMemStream);
+				aArray = aMemStream.ToArray();
+			}
+			if (aArray.Length == 0)
+			{
+				throw new Exception("コメントサーバーのデータが空です。");
+			}
+
+			return aArray;
+		}
+
+		// --------------------------------------------------------------------
+		// コメントサーバーからコメントをダウンロード
+		// --------------------------------------------------------------------
+		private Task DownloadCommentAsync()
 		{
 			return Task.Run(() =>
 			{
@@ -303,17 +320,7 @@ namespace YukkoView
 								Thread.Sleep(Common.GENERAL_SLEEP_TIME);
 
 								// ダウンロード
-								Byte[] aArray;
-								using (MemoryStream aMemStream = new MemoryStream())
-								{
-									aDownloader.Download(mYukkoViewSettings.ServerUrl + "?r=" + HttpUtility.UrlEncode(mYukkoViewSettings.RoomName, Encoding.UTF8) + "&v=3",
-											aMemStream);
-									aArray = aMemStream.ToArray();
-								}
-								if (aArray.Length == 0)
-								{
-									throw new Exception("コメントサーバーのデータが空です。");
-								}
+								Byte[] aArray = DownloadComment(aDownloader);
 
 								// サーバーとの通信に成功したのでエラー表示解除
 								ClearIsCommentReceiveError();
@@ -356,7 +363,6 @@ namespace YukkoView
 					mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 				}
 			});
-
 		}
 
 		// --------------------------------------------------------------------
@@ -404,13 +410,21 @@ namespace YukkoView
 			// ログ初期化
 			mLogWriter = new LogWriter(TRACE_SOURCE_NAME);
 			mLogWriter.ApplicationQuitToken = mClosingCancellationTokenSource.Token;
+			YukkoViewCommon.LogWriter = mLogWriter;
+			mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "起動しました：" + YukkoViewCommon.APP_NAME_J + " "
+					+ YukkoViewCommon.APP_VER + " ====================");
+#if DEBUG
+			mLogWriter.ShowLogMessage(TraceEventType.Verbose, "デバッグモード：" + Common.DEBUG_ENABLED_MARK);
+#endif
+
+			// カレントフォルダー正規化（ゆかりから起動された場合はゆかりのフォルダーになっているため）
+			Environment.CurrentDirectory = Path.GetDirectoryName(Application.ExecutablePath);
 
 			// タイトルバー
 			Text = YukkoViewCommon.APP_NAME_J;
 #if DEBUG
 			Text = "［デバッグ］" + Text;
 #endif
-
 
 			// 設定の読み込み
 			mYukkoViewSettings.Reload();
@@ -546,13 +560,32 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		// コメントサーバーからプッシュ通知を受信
 		// --------------------------------------------------------------------
-		private Task ReceivePushComment()
+		private Task ReceivePushCommentAsync()
 		{
 			return Task.Run(() =>
 			{
 				TcpListener aListener = null;
 				try
 				{
+					// ゆかり通信チェック
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "ゆかり通信チェック");
+					Downloader aDownloader = new Downloader();
+					aDownloader.CancellationToken = mClosingCancellationTokenSource.Token;
+					for (; ; )
+					{
+						try
+						{
+							Byte[] aArray = DownloadComment(aDownloader);
+							ClearIsCommentReceiveError();
+							break;
+						}
+						catch (Exception)
+						{
+							EnableIsCommentReceiveError();
+							Thread.Sleep(Common.GENERAL_SLEEP_TIME);
+						}
+					}
+
 					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントプッシュ受信開始");
 
 					// IPv4 と IPv6 の全ての IP アドレスを Listen する
@@ -700,7 +733,6 @@ namespace YukkoView
 					{
 						aIsWatch = false;
 					}
-
 				}
 			}
 
@@ -715,7 +747,6 @@ namespace YukkoView
 			{
 				FileSystemWatcherYukariConfig.EnableRaisingEvents = false;
 			}
-
 		}
 
 		// --------------------------------------------------------------------
@@ -744,14 +775,12 @@ namespace YukkoView
 			// ビューアウィンドウ
 			SetComboBoxDisplay(mYukkoViewSettings.Display);
 			SetComboBoxWindowState(mYukkoViewSettings.CommentWindowState);
-
-
 		}
 
 		// --------------------------------------------------------------------
 		// コメント表示開始
 		// --------------------------------------------------------------------
-		private Task Start()
+		private Task StartCommentAsync()
 		{
 			mIsRunning = true;
 			mIsCommentReceiveError = false;
@@ -772,41 +801,51 @@ namespace YukkoView
 			mStopCancellationTokenSource = new CancellationTokenSource();
 			if (mYukkoViewSettings.ReceivePush)
 			{
-				return ReceivePushComment();
+				return ReceivePushCommentAsync();
 			}
 			else
 			{
-				return DownloadComment();
+				return DownloadCommentAsync();
 			}
 		}
 
 		// --------------------------------------------------------------------
 		// コメント表示停止
 		// --------------------------------------------------------------------
-		private void Stop()
+		private Task StopCommentAsync()
 		{
-			mIsRunning = false;
-			UpdateStatusLabels();
-			UpdatePlayerButtons();
-			mFormViewer.Stop();
-
-			mStopCancellationTokenSource.Cancel();
-
-			if (mYukkoViewSettings.ReceivePush)
+			return Task.Run(() =>
 			{
-				// ダミーコメントを投稿してプッシュ受信を終了させる
-				TcpClient aClient = new TcpClient("localhost", mYukkoViewSettings.ReceivePushPort);
-				using (NetworkStream aNetworkStream = aClient.GetStream())
+				try
 				{
-					aNetworkStream.ReadTimeout = TCP_TIMEOUT;
-					aNetworkStream.WriteTimeout = TCP_TIMEOUT;
-					Byte[] aSendBytes = Encoding.UTF8.GetBytes("X30FFFFFF1900-01-01 00:00:00 \t");
-					aNetworkStream.Write(aSendBytes, 0, aSendBytes.Length);
-				}
-				aClient.Close();
-			}
+					mIsRunning = false;
+					UpdateStatusLabels();
+					UpdatePlayerButtons();
+					mFormViewer.Stop();
 
-			mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメント表示終了");
+					mStopCancellationTokenSource.Cancel();
+
+					if (mYukkoViewSettings.ReceivePush)
+					{
+						// ダミーコメントを投稿してプッシュ受信を終了させる
+						TcpClient aClient = new TcpClient("localhost", mYukkoViewSettings.ReceivePushPort);
+						using (NetworkStream aNetworkStream = aClient.GetStream())
+						{
+							aNetworkStream.ReadTimeout = TCP_TIMEOUT;
+							aNetworkStream.WriteTimeout = TCP_TIMEOUT;
+							Byte[] aSendBytes = Encoding.UTF8.GetBytes("X30FFFFFF1900-01-01 00:00:00 \t");
+							aNetworkStream.Write(aSendBytes, 0, aSendBytes.Length);
+						}
+						aClient.Close();
+					}
+
+					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメント表示終了");
+				}
+				catch (Exception oExcep)
+				{
+					mLogWriter.ShowLogMessage(TraceEventType.Error, "コメント表示終了時エラー：" + oExcep.Message, true);
+				}
+			});
 		}
 
 		// --------------------------------------------------------------------
@@ -917,15 +956,6 @@ namespace YukkoView
 			{
 				// メンバ変数の初期化
 				Init();
-				mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "起動しました：" + YukkoViewCommon.APP_NAME_J + " "
-						+ YukkoViewCommon.APP_VER + " ====================");
-
-#if DEBUG
-				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "デバッグモード：" + Common.DEBUG_ENABLED_MARK);
-#endif
-
-
-
 			}
 			catch (Exception oExcep)
 			{
@@ -961,7 +991,7 @@ namespace YukkoView
 				// 更新起動時とパス変更時の処理
 				if (aVerChanged || aPathChanged)
 				{
-					YukkoViewCommon.LogEnvironmentInfo(mLogWriter);
+					YukkoViewCommon.LogEnvironmentInfo();
 				}
 				if (aVerChanged)
 				{
@@ -971,7 +1001,7 @@ namespace YukkoView
 				// 必要に応じてちょちょいと自動更新を起動
 				if (mYukkoViewSettings.IsCheckRssNeeded())
 				{
-					if (YukkoViewCommon.LaunchUpdater(true, false, IntPtr.Zero, false, false, mLogWriter))
+					if (YukkoViewCommon.LaunchUpdater(true, false, IntPtr.Zero, false, false))
 					{
 						mYukkoViewSettings.RssCheckDate = DateTime.Now.Date;
 						mYukkoViewSettings.Save();
@@ -1003,7 +1033,7 @@ namespace YukkoView
 				// 自動開始
 				if (mYukkoViewSettings.AutoRun)
 				{
-					await Start();
+					await StartCommentAsync();
 				}
 			}
 			catch (Exception oExcep)
@@ -1095,7 +1125,7 @@ namespace YukkoView
 		{
 			try
 			{
-				await Start();
+				await StartCommentAsync();
 			}
 			catch (Exception oExcep)
 			{
@@ -1104,11 +1134,11 @@ namespace YukkoView
 			}
 		}
 
-		private void ButtonStop_Click(object sender, EventArgs e)
+		private async void ButtonStop_Click(object sender, EventArgs e)
 		{
 			try
 			{
-				Stop();
+				await StopCommentAsync();
 			}
 			catch (Exception oExcep)
 			{
@@ -1187,7 +1217,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "設定ファイル参照時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void TextBoxServerUrl_TextChanged(object sender, EventArgs e)
@@ -1202,7 +1231,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "コメントサーバー入力時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void TextBoxRoomName_TextChanged(object sender, EventArgs e)
@@ -1217,7 +1245,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "ルーム名入力時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void FileSystemWatcherYukariConfig_Changed(object sender, FileSystemEventArgs e)
@@ -1244,7 +1271,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "ゆかり設定ファイル変更検出時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private async void ButtonSettings_Click(object sender, EventArgs e)
@@ -1252,33 +1278,26 @@ namespace YukkoView
 			try
 			{
 				Boolean aIsRunningBak = mIsRunning;
+				Task aTask = null;
 
-				using (FormSettings aFormSettings = new FormSettings(mLogWriter))
+				using (FormSettings aFormSettings = new FormSettings(mYukkoViewSettings, mLogWriter))
 				{
-					// ApplicationSettingsBase が [SerializableAttribute] ではないので DeepClone() が使えない
-					// YukkoViewSettings が参照型を持った時は注意
-					aFormSettings.YukkoViewSettings = mYukkoViewSettings.Clone();
-
 					// 設定時はビューアウィンドウを非表示にする、コメントは停止する
 					mFormViewer.Hide();
 					if (aIsRunningBak)
 					{
-						Stop();
+						aTask = StopCommentAsync();
 					}
 					DialogResult aResult = aFormSettings.ShowDialog(this);
-					Task aTask = null;
 					if (aIsRunningBak)
 					{
-						aTask = Start();
+						if (aTask != null)
+						{
+							await aTask;
+						}
+						aTask = StartCommentAsync();
 					}
 					mFormViewer.Show();
-
-					// 値の更新
-					if (aResult == DialogResult.OK)
-					{
-						mYukkoViewSettings = aFormSettings.YukkoViewSettings;
-						mYukkoViewSettings.Save();
-					}
 
 					// コメント開始タスクの手綱を握る
 					if (aTask != null)
@@ -1292,7 +1311,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "環境設定時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void ButtonHelp_Click(object sender, EventArgs e)
@@ -1325,21 +1343,19 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "バージョン情報メニュー実行時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void ヘルプHToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			try
 			{
-				YukkoViewCommon.ShowHelp(mLogWriter);
+				YukkoViewCommon.ShowHelp();
 			}
 			catch (Exception oExcep)
 			{
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "ヘルプメニュー実行時エラー：\n" + oExcep.Message);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 
 		private void 改訂履歴UToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1353,7 +1369,6 @@ namespace YukkoView
 				mLogWriter.ShowLogMessage(TraceEventType.Error, "改訂履歴を表示できませんでした：\n" + FILE_NAME_HISTORY);
 				mLogWriter.ShowLogMessage(TraceEventType.Verbose, "　スタックトレース：\n" + oExcep.StackTrace);
 			}
-
 		}
 	} // public partial class FormControl
 
