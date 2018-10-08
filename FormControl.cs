@@ -298,10 +298,11 @@ namespace YukkoView
 				try
 				{
 					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントダウンロード開始");
+					CancellationTokenSource aStopCancellationTokenSourceBak = mStopCancellationTokenSource;
 
 					// ダウンロード
 					Downloader aDownloader = new Downloader();
-					aDownloader.CancellationToken = mClosingCancellationTokenSource.Token;
+					aDownloader.CancellationToken = aStopCancellationTokenSourceBak.Token;
 
 					for (; ; )
 					{
@@ -348,7 +349,7 @@ namespace YukkoView
 
 						// しばらく休憩
 						Thread.Sleep(mYukkoViewSettings.Interval);
-						mStopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+						aStopCancellationTokenSourceBak.Token.ThrowIfCancellationRequested();
 						mClosingCancellationTokenSource.Token.ThrowIfCancellationRequested();
 					}
 
@@ -567,23 +568,32 @@ namespace YukkoView
 				TcpListener aListener = null;
 				try
 				{
+					CancellationTokenSource aStopCancellationTokenSourceBak = mStopCancellationTokenSource;
+
 					// ゆかり通信チェック
 					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "ゆかり通信チェック");
 					Downloader aDownloader = new Downloader();
-					aDownloader.CancellationToken = mClosingCancellationTokenSource.Token;
+					aDownloader.CancellationToken = aStopCancellationTokenSourceBak.Token;
 					for (; ; )
 					{
 						try
 						{
 							Byte[] aArray = DownloadComment(aDownloader);
+
+							// エラー無くダウンロードできたらチェックループ終了
 							ClearIsCommentReceiveError();
 							break;
 						}
 						catch (Exception)
 						{
-							EnableIsCommentReceiveError();
-							Thread.Sleep(Common.GENERAL_SLEEP_TIME);
 						}
+
+						// エラー有りの場合はループを続ける
+						EnableIsCommentReceiveError();
+						Thread.Sleep(YukkoViewCommon.CHECK_CONNECTION_INTERVAL);
+
+						aStopCancellationTokenSourceBak.Token.ThrowIfCancellationRequested();
+						mClosingCancellationTokenSource.Token.ThrowIfCancellationRequested();
 					}
 
 					mLogWriter.ShowLogMessage(Common.TRACE_EVENT_TYPE_STATUS, "コメントプッシュ受信開始");
@@ -680,7 +690,7 @@ namespace YukkoView
 							EnableIsCommentReceiveError();
 						}
 
-						mStopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+						aStopCancellationTokenSourceBak.Token.ThrowIfCancellationRequested();
 						mClosingCancellationTokenSource.Token.ThrowIfCancellationRequested();
 					}
 				}
@@ -797,7 +807,6 @@ namespace YukkoView
 			mFormViewer.AddComment(aCommentInfo);
 
 			// コメントサーバーからコメントを受信
-			mStopCancellationTokenSource.Dispose();
 			mStopCancellationTokenSource = new CancellationTokenSource();
 			if (mYukkoViewSettings.ReceivePush)
 			{
@@ -882,10 +891,13 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		private void UpdatePlayerButtons()
 		{
-			ButtonStart.Enabled = !mIsRunning;
-			ButtonStop.Enabled = mIsRunning;
-			TextBoxTest.Enabled = mIsRunning;
-			ButtonTest.Enabled = mIsRunning;
+			Invoke(new Action(() =>
+			{
+				ButtonStart.Enabled = !mIsRunning;
+				ButtonStop.Enabled = mIsRunning;
+				TextBoxTest.Enabled = mIsRunning;
+				ButtonTest.Enabled = mIsRunning;
+			}));
 		}
 
 		// --------------------------------------------------------------------
@@ -900,7 +912,6 @@ namespace YukkoView
 			// 手動
 			TextBoxServerUrl.Enabled = (mYukkoViewSettings.ServerSettingsType == ServerSettingsType.Manual);
 			TextBoxRoomName.Enabled = (mYukkoViewSettings.ServerSettingsType == ServerSettingsType.Manual);
-
 		}
 
 		// --------------------------------------------------------------------
@@ -964,7 +975,7 @@ namespace YukkoView
 			}
 		}
 
-		private async void FormControl_Shown(object sender, EventArgs e)
+		private void FormControl_Shown(object sender, EventArgs e)
 		{
 			try
 			{
@@ -1030,10 +1041,10 @@ namespace YukkoView
 				mFormViewer.Show();
 				MoveFormViewer();
 
-				// 自動開始
+				// 自動開始（async を待機しない）
 				if (mYukkoViewSettings.AutoRun)
 				{
-					await StartCommentAsync();
+					Task aSuppressWarning = StartCommentAsync();
 				}
 			}
 			catch (Exception oExcep)
@@ -1121,11 +1132,12 @@ namespace YukkoView
 			}
 		}
 
-		private async void ButtonStart_Click(object sender, EventArgs e)
+		private void ButtonStart_Click(object sender, EventArgs e)
 		{
 			try
 			{
-				await StartCommentAsync();
+				// async を待機しない
+				Task aSuppressWarning = StartCommentAsync();
 			}
 			catch (Exception oExcep)
 			{
@@ -1134,11 +1146,12 @@ namespace YukkoView
 			}
 		}
 
-		private async void ButtonStop_Click(object sender, EventArgs e)
+		private void ButtonStop_Click(object sender, EventArgs e)
 		{
 			try
 			{
-				await StopCommentAsync();
+				// async を待機しない
+				Task aSuppressWarning = StopCommentAsync();
 			}
 			catch (Exception oExcep)
 			{
@@ -1273,12 +1286,11 @@ namespace YukkoView
 			}
 		}
 
-		private async void ButtonSettings_Click(object sender, EventArgs e)
+		private void ButtonSettings_Click(object sender, EventArgs e)
 		{
 			try
 			{
 				Boolean aIsRunningBak = mIsRunning;
-				Task aTask = null;
 
 				using (FormSettings aFormSettings = new FormSettings(mYukkoViewSettings, mLogWriter))
 				{
@@ -1286,24 +1298,16 @@ namespace YukkoView
 					mFormViewer.Hide();
 					if (aIsRunningBak)
 					{
-						aTask = StopCommentAsync();
+						// async を待機しない
+						Task aSuppressWarning = StopCommentAsync();
 					}
 					DialogResult aResult = aFormSettings.ShowDialog(this);
 					if (aIsRunningBak)
 					{
-						if (aTask != null)
-						{
-							await aTask;
-						}
-						aTask = StartCommentAsync();
+						// async を待機しない
+						Task aSuppressWarning = StartCommentAsync();
 					}
 					mFormViewer.Show();
-
-					// コメント開始タスクの手綱を握る
-					if (aTask != null)
-					{
-						await aTask;
-					}
 				}
 			}
 			catch (Exception oExcep)

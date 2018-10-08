@@ -436,25 +436,28 @@ namespace YukkoView
 		// --------------------------------------------------------------------
 		private void UpdateControls()
 		{
-			// ディスプレイ切り替え
-			ButtonDisplay.Visible = !mIsRunning;
-			ButtonDisplay.Enabled = Screen.AllScreens.Length > 1;
-
-			// 最大化
-			ButtonMaximize.Visible = !mIsRunning;
-			if (WindowState == FormWindowState.Maximized)
+			Invoke(new Action(() =>
 			{
-				ButtonMaximize.Text = "2";
-				ToolTipViewer.SetToolTip(ButtonMaximize, "元に戻す");
-			}
-			else
-			{
-				ButtonMaximize.Text = "1";
-				ToolTipViewer.SetToolTip(ButtonMaximize, "最大化");
-			}
+				// ディスプレイ切り替え
+				ButtonDisplay.Visible = !mIsRunning;
+				ButtonDisplay.Enabled = Screen.AllScreens.Length > 1;
 
-			// リサイズグリップ
-			LabelGrip.Visible = !mIsRunning && WindowState != FormWindowState.Maximized;
+				// 最大化
+				ButtonMaximize.Visible = !mIsRunning;
+				if (WindowState == FormWindowState.Maximized)
+				{
+					ButtonMaximize.Text = "2";
+					ToolTipViewer.SetToolTip(ButtonMaximize, "元に戻す");
+				}
+				else
+				{
+					ButtonMaximize.Text = "1";
+					ToolTipViewer.SetToolTip(ButtonMaximize, "最大化");
+				}
+
+				// リサイズグリップ
+				LabelGrip.Visible = !mIsRunning && WindowState != FormWindowState.Maximized;
+			}));
 		}
 
 		// ====================================================================

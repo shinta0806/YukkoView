@@ -46,7 +46,7 @@ namespace YukkoView.Shared
 		// --------------------------------------------------------------------
 		public const String APP_ID = "YukkoView";
 		public const String APP_NAME_J = "ゆっこビュー";
-		public const String APP_VER = "Ver 2.62";
+		public const String APP_VER = "Ver 2.65";
 		public const String COPYRIGHT_J = "Copyright (C) 2017-2018 by SHINTA";
 
 		// --------------------------------------------------------------------
@@ -93,6 +93,9 @@ namespace YukkoView.Shared
 
 		// 連続投稿防止間隔 [ms]
 		public const Int32 CONTINUOUS_PREVENT_TIME = 5000;
+
+		// 通信確認間隔 [ms]
+		public const Int32 CHECK_CONNECTION_INTERVAL = 1000;
 
 		// ====================================================================
 		// public プロパティー
